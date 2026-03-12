@@ -1,0 +1,102 @@
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Text To Word</title></head><body><h1 data-v-39bb77c9="">Account troubleshooting - Login errors</h1>
+<div id="fdf65a3f74c11014b73eda6906db363c" class="body-wrapper" data-v-39bb77c9="">
+<div class="body">
+<p class="p">There are a number of reasons why your login can fail. Below is a list of the possible error messages and an explanation of the reasons behind them.</p>
+<aside class="note" aria-labelledby="n0t">
+<div id="n0t" class="title"><strong>Note</strong></div>
+<p class="p">Password reset functionality is available on the login screen. If you have trouble resetting your password, please speak to your Account Owner.</p>
+</aside>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__could-not-log-in-to-the-system-please-check-whether-account-name-user-name-and-password-were-entered-correctly" class="section">
+<section class="section">
+<h2 id="could-not-log-in-to-the-system.-please-check-whether-account-name,-user-name-and-password-were-entered-correctly." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">Could not log in to the system. Please check whether account name, user name and password were entered correctly.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">When receiving the above message make sure you are:</p>
+<ul class="ul">
+<li class="li">
+<p>Using the right credentials. Remember that your password is case sensitive, and that some browsers or password managers might automatically enter the wrong information for you.</p>
+</li>
+<li class="li">
+<p>Using the correct URL to log in. The solution hosts multiple environments and you will only be able to log in to the one which hosts your account.</p>
+</li>
+<li class="li">
+<p>If Single Sign-on is enabled on the account, logging in with user name and password no longer works. You&rsquo;ll need to login by clicking&nbsp;<span class="ph uicontrol">Login via SSO</span>&nbsp;on the login page.</p>
+</li>
+</ul>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__a-user-is-currently-logged-in-with-the-same-user-name-you-did-not-log-out-properly-or-another-person-is-using-your-user-name-at-present-click-here-to-end-the-current-session-and-log-in-again" class="section">
+<section class="section">
+<h2 id="a-user-is-currently-logged-in-with-the-same-user-name.-you-did-not-log-out-properly-or-another-person-is-using-your-user-name-at-present.-click-here-to-end-the-current-session-and-log-in-again." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">A user is currently logged in with the same user name. You did not log out properly or another person is using your user name at present. Click here to end the current session and log in again.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">The solution does not allow concurrent sessions for the same user in the same account. Before logging in you must terminate the previous session allocated for this account. This is done by simply clicking the link in the message.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__as-an-additional-security-feature-we-recommend-changing-your-password-regularly-this-page-will-appear-at-regular-intervals" class="section">
+<section class="section">
+<h2 id="as-an-additional-security-feature-we-recommend-changing-your-password-regularly.-this-page-will-appear-at-regular-intervals." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">As an additional security feature we recommend changing your password regularly. This page will appear at regular intervals.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">This message appears when your password has expired; simply change your password and you will be able to log in. The expiration period is defined by you in the application and can be easily adjusted in the account settings page.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__you-are-logging-in-from-an-unrecognized-ip-address-a-security-code-has-been-sent-to-your-mobile-phone-please-enter-the-code-to-log-in" class="section">
+<section class="section">
+<h2 id="you-are-logging-in-from-an-unrecognized-ip-address.-a-security-code-has-been-sent-to-your-mobile-phone.-please-enter-the-code-to-log-in." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">You are logging in from an unrecognized IP address. A security code has been sent to your mobile phone. Please enter the code to log in.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">An IP allowlist has been enabled for your account. This feature allows you to specify IP addresses which do not require two-factor authentication. The IP address you are using currently is not on this allowlist, therefore you need to verify your identity by entering the code we sent to the mobile phone number associated with your user.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__you-are-logging-in-from-an-unrecognized-ip-address-a-security-code-has-been-sent-to-your-email-address-please-enter-the-code-to-log-in" class="section">
+<section class="section">
+<h2 id="you-are-logging-in-from-an-unrecognized-ip-address.-a-security-code-has-been-sent-to-your-email-address.-please-enter-the-code-to-log-in." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">You are logging in from an unrecognized IP address. A security code has been sent to your email address. Please enter the code to log in.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">An IP allowlist has been enabled for your account. This feature allows you to specify IP addresses which do not require two-factor authentication. The IP address you are using currently is not on this allowlist, therefore you need to verify your identity by entering the code we sent to your email address.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__could-not-log-into-the-system-please-check-whether-the-account-name-user-name-and-activation-code-were-entered-correctly" class="section">
+<section class="section">
+<h2 id="could-not-log-into-the-system.-please-check-whether-the-account-name,-user-name-and-activation-code-were-entered-correctly." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">Could not log into the system. Please check whether the account name, user name and activation code were entered correctly.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">Either the activation code you were sent was not entered correctly, or your account name and user name do not match.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__you-are-not-allowed-to-log-in-from-this-ip-address-please-contact-your-account-owner-to-authorize-this-address-or-activate-the-two-factor-authentication-function" class="section">
+<section class="section">
+<h2 id="you-are-not-allowed-to-log-in-from-this-ip-address.-please-contact-your-account-owner-to-authorize-this-address-or-activate-the-two-factor-authentication-function." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">You are not allowed to log in from this IP address. Please contact your Account Owner to authorize this address or activate the two-factor authentication function.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">An IP allowlist has been enabled for your account. You are attempting to log in from an unauthorized IP address, but we do not have a mobile phone number or email address to send the authentication code to. Please log in from an authorized IP address, or contact your Account Owner to enable two-factor authentication for your user account.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__your-account-has-been-disabled-please-contact-your-account-owner-in-order-to-reactivate-it" class="section">
+<section class="section">
+<h2 id="your-account-has-been-disabled.-please-contact-your-account-owner-in-order-to-reactivate-it." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">Your account has been disabled. Please contact your Account Owner in order to reactivate it.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">One possible cause of this is account inactivity. For security reasons, the solution regularly disables accounts which show no recent activity. It is not possible to log in until someone manually activates your account. Currently, this is done by your Account Owner. Please contact your Account Owner to resolve this issue.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__this-account-has-had-too-many-failed-login-attempts-lately-as-a-security-measure-it-has-been-temporarily-locked-for-10-minutes" class="section">
+<section class="section">
+<h2 id="this-account-has-had-too-many-failed-login-attempts-lately;-as-a-security-measure,-it-has-been-temporarily-locked-for-10-minutes." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">This account has had too many failed login attempts lately; as a security measure, it has been temporarily locked for 10 minutes.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">The solution allows only a certain number of failed attempts to enter the correct password. If this number is exceeded, your user account is locked for a defined period of time, after which you will be able to log in again with your correct password. The default setting is 5 failed attempts which result in a 10-minute lock-out, but this can be customized and the exact configuration depends on your user and account settings.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__your-account-has-been-temporarily-locked-for-security-reasons-this-lock-will-be-automatically-lifted-once-the-specified-time-elapses" class="section">
+<section class="section">
+<h2 id="your-account-has-been-temporarily-locked-for-security-reasons.-this-lock-will-be-automatically-lifted-once-the-specified-time-elapses." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">Your account has been temporarily locked for security reasons. This lock will be automatically lifted once the specified time elapses.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">As a protection against &lsquo;brute force&rsquo; password-guessing attacks, your account has been temporary locked. Once the lock-out period has expired you will be able to log in again with your correct password. This period is 10 minutes by default but can be configured for each account. Please contact support if you need to unlock the account before the lock-out period expires.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__one-time-password-authentication-failed-could-not-log-in-to-the-system-please-be-aware-that-one-time-passwords-are-highly-time-sensitive" class="section">
+<section class="section">
+<h2 id="one-time-password-authentication-failed.-could-not-log-in-to-the-system.-please-be-aware-that-one-time-passwords-are-highly-time-sensitive." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">One-time password authentication failed. Could not log in to the system. Please be aware that one-time passwords are highly time-sensitive.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">This message may be caused by waiting too long between typing the one-time password and submitting it. Try to enter a new code actually displayed on the authenticator app. Also, if you disable and reenable TFA, previously-created authenticator profiles will not work. You can only use the most recent one. If you don&rsquo;t have access to the device running the authenticator application, you may only gain access to your account by either connecting from a trusted IP, or an already trusted device. If you don&rsquo;t have access to any of these, please call support.</p>
+</section>
+</div>
+<div id="loiofdf65a3f74c11014b73eda6906db363c__section_hzh_bvx_r2c" class="section">
+<section class="section">
+<h2 id="login-failed.-a-problem-was-detected-with-your-user-account.-please-contact-an-account-owner-to-resolve-it." class="section_title" data-v-da88ee4a=""><span data-v-da88ee4a="">Login Failed. A problem was detected with your user account. Please contact an Account Owner to resolve it.</span><button class="button icon minimal copy-button" title="Copy link to section" type="button" data-v-e29c5629="" data-v-da88ee4a=""></button></h2>
+<p class="p">This error message is displayed when there are multiple local user entities with matching email addresses.</p>
+<p class="p">Here is what you need to do to resolve this issue:</p>
+<ol class="ol">
+<li class="li">
+<p>Request your Account Owner to clean up the duplicate email addresses.</p>
+</li>
+<li class="li">
+<p>After resolving the duplicate email addresses, log in by following the instructions described in the</p>
+</li>
+</ol>
+</section>
+</div>
+</div>
+</div></body></html>
