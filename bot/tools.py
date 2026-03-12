@@ -9,14 +9,14 @@ from typing import List, Dict, Optional
 
 
 def _get_db_connection():
-    """Build a psycopg2 connection, URL-encoding the password if needed."""
+    """Build a psycopg2 connection, URL-encoding the password and requiring SSL."""
     raw_url = os.environ["DATABASE_URL"]
     parsed = urlparse(raw_url)
     encoded_password = quote_plus(parsed.password) if parsed.password else ""
     safe_url = urlunparse(parsed._replace(
         netloc=f"{parsed.username}:{encoded_password}@{parsed.hostname}:{parsed.port or 5432}"
     ))
-    return psycopg2.connect(safe_url)
+    return psycopg2.connect(safe_url, sslmode="require")
 
 from db import incidents as db
 from db.supabase_client import supabase
