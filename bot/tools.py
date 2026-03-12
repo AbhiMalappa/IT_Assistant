@@ -4,19 +4,22 @@ import psycopg2
 import psycopg2.extras
 import pandas as pd
 from datetime import datetime
-from urllib.parse import urlparse, quote_plus, urlunparse
+from urllib.parse import urlparse
 from typing import List, Dict, Optional
 
 
 def _get_db_connection():
-    """Build a psycopg2 connection, URL-encoding the password and requiring SSL."""
+    """Build a psycopg2 connection using individual parameters to avoid URL encoding issues."""
     raw_url = os.environ["DATABASE_URL"]
     parsed = urlparse(raw_url)
-    encoded_password = quote_plus(parsed.password) if parsed.password else ""
-    safe_url = urlunparse(parsed._replace(
-        netloc=f"{parsed.username}:{encoded_password}@{parsed.hostname}:{parsed.port or 5432}"
-    ))
-    return psycopg2.connect(safe_url, sslmode="require")
+    return psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        dbname=parsed.path.lstrip("/"),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode="require",
+    )
 
 from db import incidents as db
 from db.supabase_client import supabase
