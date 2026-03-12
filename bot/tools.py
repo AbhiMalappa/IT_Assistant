@@ -12,10 +12,12 @@ def _get_db_connection():
     """Build a psycopg2 connection using individual parameters to avoid URL encoding issues."""
     raw_url = os.environ["DATABASE_URL"]
     parsed = urlparse(raw_url)
+    # Strip path to get dbname and clean any invisible characters from copy-paste
+    dbname = parsed.path.lstrip("/").strip().replace(" ", "")
     return psycopg2.connect(
         host=parsed.hostname,
         port=parsed.port or 5432,
-        dbname=parsed.path.lstrip("/"),
+        dbname=dbname,
         user=parsed.username,
         password=parsed.password,
         sslmode="require",
