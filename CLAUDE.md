@@ -49,6 +49,11 @@ IT_Assistant/
 │   ├── supabase_client.py             # Supabase client singleton
 │   ├── incidents.py                   # CRUD operations for incidents table
 │   └── conversation_messages.py       # [planned] CRUD for conversation_messages table
+├── chart_png/
+│   ├── __init__.py
+│   ├── generator.py                   # Builds Plotly Figure from data + chart config (no project knowledge)
+│   ├── store.py                       # Saves Figure as PNG to /tmp/charts/
+│   └── tool.py                        # plot_chart() tool: calls generator + store, returns chart_path
 ├── scripts/
 │   ├── load_incidents.py              # One-time CSV loader — already run
 │   └── re_embed.py                    # Re-embed all incidents when switching providers
@@ -79,11 +84,17 @@ Agent (agent.py)  ←── Claude decides which tool(s) to call at runtime
      │                             → Supabase (fetch full records)
      ├── get_incident_by_number()  → Supabase (exact INC lookup)
      ├── sql_query()               → Supabase (aggregation, counts, ranking)
-     └── get_all_by_system()       → Supabase (all incidents for a system)
+     ├── get_all_by_system()       → Supabase (all incidents for a system)
+     ├── forecast_incidents()      → Supabase + ExponentialSmoothingForecaster
+     └── plot_chart()              → chart_png → /tmp/charts/*.png
           ↓
      Claude formulates final answer
           ↓
-     Response sent back to Slack
+     agent.run() returns (text, chart_path)
+          ↓
+     slack_handler: posts text + uploads PNG via files_upload_v2
+          ↓
+     Text + chart appear inline in Slack
 ```
 
 ### Why Agentic Tool-Use
@@ -440,6 +451,7 @@ Key details:
 | Vector DB | Pinecone | Decoupled from relational DB, portable, purpose-built, namespace support |
 | Relational DB | Supabase (Postgres) | Simple managed Postgres, no pgvector needed |
 | Deployment | Railway | Zero DevOps, small team, fast iteration |
+| Charting | Plotly PNG via `chart_png/` | Inline in Slack, no server dependency, ephemeral /tmp storage |
 | Agent Pattern | Claude tool-use | Claude decides RAG vs SQL vs direct lookup at runtime — no hardcoded intent classifier |
 | Aggregation | Text-to-SQL via psycopg2 | Pure RAG misses full dataset; SQL handles counts, rankings, trends correctly |
 | Conversation Memory | Supabase (swappable) | Token-aware buffer, dual storage (full + summary), tool tracking per message |

@@ -25,6 +25,23 @@ def _post_response(say, text: str):
             say(chunk)
 
 
+def _upload_chart(channel: str, chart_path: str, chart_title: str, thread_ts: str = None):
+    """Upload a PNG chart to a Slack channel, optionally in a thread."""
+    try:
+        kwargs = {
+            "channel": channel,
+            "file": chart_path,
+            "title": chart_title,
+            "filename": "chart.png",
+        }
+        if thread_ts:
+            kwargs["thread_ts"] = thread_ts
+        app.client.files_upload_v2(**kwargs)
+    except Exception as e:
+        # Non-fatal — log and continue; text response was already sent
+        print(f"[chart_upload] Failed to upload chart: {e}")
+
+
 def _get_thread_id(event: dict) -> str:
     """
     Extract a stable thread_id from a Slack event.
@@ -49,8 +66,12 @@ def handle_mention(event, say):
 
     thread_id = _get_thread_id(event)
     say("Looking into that...")
-    response = agent_run(user_message, thread_id=thread_id)
+    response, chart_path = agent_run(user_message, thread_id=thread_id)
     _post_response(say, response)
+    if chart_path:
+        channel = event.get("channel", "")
+        thread_ts = event.get("thread_ts") or event.get("ts")
+        _upload_chart(channel, chart_path, "Chart", thread_ts=thread_ts)
 
 
 # --- Direct messages ---
@@ -66,8 +87,12 @@ def handle_dm(event, say):
 
     thread_id = _get_thread_id(event)
     say("Looking into that...")
-    response = agent_run(user_message, thread_id=thread_id)
+    response, chart_path = agent_run(user_message, thread_id=thread_id)
     _post_response(say, response)
+    if chart_path:
+        channel = event.get("channel", "")
+        thread_ts = event.get("thread_ts") or event.get("ts")
+        _upload_chart(channel, chart_path, "Chart", thread_ts=thread_ts)
 
 
 # --- Slash command: /incident ---
@@ -97,8 +122,10 @@ def handle_incident_command(ack, say, command):
             say("Usage: `/incident search <your question>`")
             return
         say("Searching...")
-        response = agent_run(arg, thread_id=thread_id)
+        response, chart_path = agent_run(arg, thread_id=thread_id)
         _post_response(say, response)
+        if chart_path:
+            _upload_chart(command.get("channel_id", ""), chart_path, "Chart")
 
     elif subcommand == "status":
         if not arg:
@@ -133,7 +160,7 @@ def handle_incident_command(ack, say, command):
             f"State: {incident['state']}\n"
             f"Resolution: {incident['resolution_notes']}"
         )
-        response = agent_run(summary_prompt, thread_id=thread_id)
+        response, _ = agent_run(summary_prompt, thread_id=thread_id)
         _post_response(say, response)
 
     else:

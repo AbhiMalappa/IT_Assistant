@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Optional
+from typing import Optional, Tuple
 from anthropic import Anthropic
 from bot.tools import TOOL_REGISTRY
 from bot.conversation_manager import conversation_manager
@@ -31,6 +31,7 @@ TOOLS — choose based on the question:
 - get_all_by_system: full dataset for a system. Use when the user wants ALL incidents for a system, not just the top few.
 - sql_query: aggregation and ranking. Use for counts, rankings, trends, averages. Write safe SELECT queries against the incidents table.
 - forecast_incidents: predict future incident volume using exponential smoothing. Use for any forward-looking volume question ("next month", "next quarter", "predict", "forecast", "expected volume"). Supports optional filters by priority, state, assignment_group, configuration_item, or label.
+- plot_chart: generate a PNG chart from tabular data and post it in Slack. Call this after sql_query or forecast_incidents when a visual would genuinely help the user understand the data. Do NOT call it for single-row results, text lookups, or search results.
 
 incidents table columns:
   id, number, opened_at, opened_by, state, contact_type, assignment_group,
@@ -52,6 +53,10 @@ RESPONSE RULES:
 7. For greetings or general questions, respond conversationally and guide the user toward asking about incidents.
 8. If a user reports a bug or wants to give feedback, provide the support contact: abhiraj7m@gmail.com
 9. For forecast results: state the model used, show the forecasted values per period, and include the MSE so the user knows the accuracy. If R² is negative, briefly note that it reflects limited historical data, not a broken model.
+10. Charting — call plot_chart when the data is clearly visual:
+    - After sql_query: call plot_chart if result has multiple rows with a categorical or date/period column + a numeric column. Use "bar" for categorical breakdowns (state, priority, assignment_group), "horizontal_bar" for ranked lists, "line" for time series by month/week.
+    - After forecast_incidents: always call plot_chart with chart_type="forecast", passing historical_data as data and forecast as forecast_data, x_column="period", y_column="count".
+    - Do NOT call plot_chart for: single-row results, search_incidents results, get_incident_by_number results, or get_all_by_system results.
 """.strip()
 
 TOOL_DEFINITIONS = [
@@ -187,6 +192,68 @@ TOOL_DEFINITIONS = [
             },
             "required": []
         }
+    },
+    {
+        "name": "plot_chart",
+        "description": (
+            "Generate a PNG chart from tabular data and post it in Slack. "
+            "Call after sql_query when the result has multiple rows with a categorical or time column + a numeric column. "
+            "Always call after forecast_incidents using chart_type='forecast'. "
+            "Do NOT call for single-row results, search results, or individual incident lookups."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": (
+                        "List of row dicts from the previous tool result. "
+                        "For forecast charts, pass the historical_data list from forecast_incidents."
+                    )
+                },
+                "chart_type": {
+                    "type": "string",
+                    "enum": ["bar", "line", "horizontal_bar", "forecast"],
+                    "description": (
+                        "bar: vertical bars for categorical breakdowns (state, priority, assignment_group). "
+                        "horizontal_bar: horizontal bars for ranked lists (top N). "
+                        "line: time series by month or week. "
+                        "forecast: historical bars + forecast line overlay."
+                    )
+                },
+                "x_column": {
+                    "type": "string",
+                    "description": "Column name from data to use for the x-axis (or categories for horizontal_bar)."
+                },
+                "y_column": {
+                    "type": "string",
+                    "description": "Column name from data to use for the y-axis. Must be numeric."
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Chart title shown at the top. Be descriptive, e.g. 'Incidents by Priority' or 'Monthly Incident Volume — SAP'."
+                },
+                "x_label": {
+                    "type": "string",
+                    "description": "Human-readable x-axis label. Optional — defaults to x_column."
+                },
+                "y_label": {
+                    "type": "string",
+                    "description": "Human-readable y-axis label. Optional — defaults to y_column."
+                },
+                "forecast_data": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": (
+                        "For chart_type='forecast' only. "
+                        "Pass the forecast list from forecast_incidents result. "
+                        "Each dict must have 'period' and 'forecasted_count' keys."
+                    )
+                }
+            },
+            "required": ["data", "chart_type", "x_column", "y_column", "title"]
+        }
     }
 ]
 
@@ -203,10 +270,16 @@ def _execute_tool(name: str, inputs: dict) -> str:
         return json.dumps({"error": str(e)})
 
 
-def run(user_message: str, thread_id: Optional[str] = None) -> str:
+def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
     """
     Agentic loop — Claude decides which tools to call, we execute them, loop until done.
     If thread_id is provided, conversation history is loaded and saved to Supabase.
+
+    Returns
+    -------
+    (text_response, chart_path)
+        chart_path is the absolute path to a PNG file if plot_chart was called,
+        otherwise None. The Slack handler uploads the file if present.
     """
     # Load conversation buffer for this thread
     messages = []
@@ -225,6 +298,10 @@ def run(user_message: str, thread_id: Optional[str] = None) -> str:
     primary_tool_input: Optional[dict] = None
     primary_tool_result: Optional[str] = None
     primary_sql: Optional[str] = None
+
+    # Chart generated by plot_chart (if called)
+    chart_path: Optional[str] = None
+    chart_title: Optional[str] = None
 
     while True:
         response = client.messages.create(
@@ -255,7 +332,7 @@ def run(user_message: str, thread_id: Optional[str] = None) -> str:
                     sql_query=primary_sql,
                 )
 
-            return final_text
+            return final_text, chart_path
 
         # Claude wants to use tools
         if response.stop_reason == "tool_use":
@@ -274,6 +351,16 @@ def run(user_message: str, thread_id: Optional[str] = None) -> str:
                         if block.name == "sql_query":
                             primary_sql = block.input.get("query")
 
+                    # Capture chart path if plot_chart was called
+                    if block.name == "plot_chart":
+                        try:
+                            result_dict = json.loads(result)
+                            if "chart_path" in result_dict:
+                                chart_path = result_dict["chart_path"]
+                                chart_title = result_dict.get("chart_title", "Chart")
+                        except Exception:
+                            pass
+
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,
@@ -283,4 +370,4 @@ def run(user_message: str, thread_id: Optional[str] = None) -> str:
             messages.append({"role": "user", "content": tool_results})
 
         else:
-            return "Unexpected response from AI. Please try again."
+            return "Unexpected response from AI. Please try again.", None
