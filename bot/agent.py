@@ -55,7 +55,7 @@ RESPONSE RULES:
 9. For forecast results: state the model used, show the forecasted values per period, and include the MSE so the user knows the accuracy. If R² is negative, briefly note that it reflects limited historical data, not a broken model.
 10. Charting — call plot_chart when the data is clearly visual:
     - After sql_query: call plot_chart if result has multiple rows with a categorical or date/period column + a numeric column. Use "bar" for categorical breakdowns (state, priority, assignment_group), "horizontal_bar" for ranked lists, "line" for time series by month/week.
-    - After forecast_incidents: always call plot_chart with chart_type="forecast", passing historical_data as data and forecast as forecast_data, x_column="period", y_column="count".
+    - After forecast_incidents: always call plot_chart with chart_type="forecast", passing historical_data as data, all_predictions as forecast_data, x_column="period", y_column="count". This produces a solid blue actual line and an orange dashed model/forecast line covering all periods.
     - Do NOT call plot_chart for: single-row results, search_incidents results, get_incident_by_number results, or get_all_by_system results.
 """.strip()
 
@@ -247,8 +247,9 @@ TOOL_DEFINITIONS = [
                     "items": {"type": "object"},
                     "description": (
                         "For chart_type='forecast' only. "
-                        "Pass the forecast list from forecast_incidents result. "
-                        "Each dict must have 'period' and 'forecasted_count' keys."
+                        "Pass all_predictions from forecast_incidents result — this contains "
+                        "in-sample fitted values for all historical periods plus the future forecast. "
+                        "Each dict has 'period' and 'forecasted_count' keys."
                     )
                 }
             },

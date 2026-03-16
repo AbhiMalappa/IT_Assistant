@@ -263,6 +263,13 @@ def forecast_incidents(
     result = forecaster.forecast(periods=periods)
 
     # --- Format output for Claude ----------------------------------------
+    # all_predictions: fitted values for all historical periods + future forecast
+    # Used by plot_chart as forecast_data to draw the full model prediction line
+    all_predictions = (
+        [{"period": p, "forecasted_count": v} for p, v in result.fitted_values]
+        + [{"period": p, "forecasted_count": v} for p, v in result.forecast]
+    )
+
     return {
         "group_by": group_by,
         "filters_applied": filters or {},
@@ -281,6 +288,7 @@ def forecast_incidents(
             {"period": period, "forecasted_count": value}
             for period, value in result.forecast
         ],
+        "all_predictions": all_predictions,
         "all_models_ranked": result.all_models_ranked,
     }
 

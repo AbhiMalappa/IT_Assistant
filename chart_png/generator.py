@@ -100,28 +100,26 @@ def build_chart(
         ))
 
     elif chart_type == "forecast":
-        # Historical — solid line
+        # Actual historical data — solid blue line
         fig.add_trace(go.Scatter(
             x=x_vals,
             y=y_vals,
             mode="lines+markers",
-            name="Historical",
+            name="Actual",
             line=dict(color=_BLUE, width=2),
             marker=dict(size=6),
         ))
-        # Forecast — dashed line in different colour, connected from last historical point
+        # Model predictions (in-sample fit + future forecast) — orange dashed line
         if forecast_data:
             fx_vals = [str(row["period"]) for row in forecast_data]
             fy_vals = [row[forecast_y_column] for row in forecast_data]
-            connect_x = [x_vals[-1]] + fx_vals
-            connect_y = [y_vals[-1]] + fy_vals
             fig.add_trace(go.Scatter(
-                x=connect_x,
-                y=connect_y,
+                x=fx_vals,
+                y=fy_vals,
                 mode="lines+markers",
-                name="Forecast",
+                name="Model / Forecast",
                 line=dict(color=_ORANGE, width=2, dash="dash"),
-                marker=dict(size=8, symbol="diamond"),
+                marker=dict(size=5),
             ))
 
     else:

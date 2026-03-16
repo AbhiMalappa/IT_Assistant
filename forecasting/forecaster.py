@@ -49,7 +49,8 @@ class ForecastResult:
     mse: float
     r2: float
     forecast_periods: int
-    forecast: List[Tuple[str, float]]       # (period_label, value)
+    forecast: List[Tuple[str, float]]       # (period_label, value) — future periods only
+    fitted_values: List[Tuple[str, float]]  # (period_label, value) — in-sample model predictions for all historical periods
     all_models_ranked: List[dict]           # every config tried, ranked by MSE
 
 
@@ -272,10 +273,16 @@ class ExponentialSmoothingForecaster:
         full_fitted = full_model.fit(optimized=True, remove_bias=False)
         raw_forecast = list(full_fitted.forecast(periods))
 
-        # Generate period labels from the series index
+        # In-sample fitted values for all historical periods
+        fitted_pairs = [
+            (str(idx), round(max(0.0, val), 2))
+            for idx, val in zip(self._full_series.index, full_fitted.fittedvalues)
+        ]
+
+        # Future forecast period labels and values
         forecast_labels = self._next_period_labels(periods)
         forecast_pairs = [
-            (label, round(max(0.0, val), 2))   # clip negative forecasts to 0
+            (label, round(max(0.0, val), 2))
             for label, val in zip(forecast_labels, raw_forecast)
         ]
 
@@ -302,6 +309,7 @@ class ExponentialSmoothingForecaster:
             r2=round(best_result.r2, 4),
             forecast_periods=periods,
             forecast=forecast_pairs,
+            fitted_values=fitted_pairs,
             all_models_ranked=all_models_ranked,
         )
 
