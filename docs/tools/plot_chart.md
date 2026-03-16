@@ -57,17 +57,21 @@ chart_png/tool.py — calls generator + store
         ↓
 chart_png/generator.py — builds Plotly Figure (no project knowledge)
         ↓
-chart_png/store.py — saves PNG to /tmp/charts/{uuid}.png
+chart_png/store.py — saves both:
+    /tmp/charts/{uuid}.png   ← for Slack inline upload
+    /tmp/charts/{uuid}.html  ← for interactive URL
         ↓
-Returns {"chart_path": "/tmp/charts/...", "chart_title": "..."}
+Returns {"chart_path": "...", "chart_id": "uuid", "chart_title": "..."}
         ↓
-agent.py — detects chart_path in result, stores it
+agent.py — captures chart_path + chart_id from result
         ↓
-agent.run() returns (text_response, chart_path)
+agent.run() returns (text_response, chart_path, chart_id)
         ↓
-slack_handler.py — uploads PNG via app.client.files_upload_v2()
-        ↓
-Chart appears inline in Slack thread
+slack_handler.py:
+    1. Uploads PNG inline via files_upload_v2 → PNG appears in chat
+    2. Posts "Open interactive chart" URL (if APP_URL is set)
+    3. Deletes PNG immediately from /tmp
+    4. Deletes HTML after 10 minutes from /tmp
 ```
 
 ---
@@ -78,6 +82,7 @@ Returns a dict:
 ```json
 {
   "chart_path": "/tmp/charts/3f8a1b2c-....png",
+  "chart_id": "3f8a1b2c-....",
   "chart_title": "Monthly Incident Volume"
 }
 ```
@@ -152,29 +157,46 @@ If generation fails, returns:
 chart_png/                  ← standalone internal package, no project knowledge
 ├── __init__.py
 ├── generator.py            ← builds Plotly Figure from data + config
-├── store.py                ← saves Figure as PNG to /tmp/charts/
-└── tool.py                 ← thin wrapper: calls generator + store, returns chart_path
+├── store.py                ← saves Figure as both PNG and HTML to /tmp/charts/
+└── tool.py                 ← thin wrapper: calls generator + store, returns chart_path + chart_id
 ```
 
-`generator.py` and `store.py` know nothing about incidents or Slack — they accept generic data and return a figure or file path. This makes the `chart_png` module reusable in other projects.
+`generator.py` and `store.py` know nothing about incidents or Slack — they accept generic data and return a figure or file paths. This makes the `chart_png` module reusable in other projects.
 
 ---
 
-## Storage
+## Storage and Cleanup
 
-Charts are saved to `/tmp/charts/` which is **ephemeral** — wiped on container restart. This is intentional: charts are single-use per query. Once uploaded to Slack, the image is permanent in the Slack workspace regardless of the server state.
+Charts are saved to `/tmp/charts/` which is **ephemeral** — wiped on container restart.
+
+| File | Deleted when |
+|---|---|
+| `{uuid}.png` | Immediately after Slack upload |
+| `{uuid}.html` | 10 minutes after posting (keeps interactive URL alive briefly) |
+| `{uuid}.html` (no APP_URL) | Immediately — HTML won't be served so no reason to keep it |
+
+Once the PNG is uploaded to Slack it is permanent in the Slack workspace regardless of server state.
 
 ---
 
-## Future: Plotly HTML (interactive charts)
+## Interactive URL
 
-When interactive charts are needed (hover, zoom, pan), migrate to a separate `chart_plotly` package:
-- Replace `generator.py` → `fig.to_html()` instead of `fig.write_image()`
-- Replace `store.py` → save `.html` to `/tmp` + add `GET /charts/{id}` FastAPI endpoint
-- Replace `tool.py` → return `chart_url` instead of `chart_path`
-- Remove `kaleido` dependency
+If `APP_URL` env var is set (Railway public URL), the bot posts a second message:
+```
+<https://your-app.railway.app/charts/{chart_id}|Open interactive chart>
+```
+This serves `{uuid}.html` via `GET /charts/{chart_id}` in `main.py`. The interactive chart supports hover tooltips, zoom, and pan via Plotly.
 
-Only `chart_png/` changes — `bot/tools.py`, `bot/agent.py`, and `bot/slack_handler.py` need minimal updates to handle a URL instead of a file path.
+---
+
+## Future: Dedicated `chart_plotly` package
+
+For a fully standalone interactive chart package (separate from this project), extract `chart_png/` into `chart_plotly/`:
+- `store.py` → HTML-only output, no PNG, no kaleido
+- `tool.py` → returns `chart_url` instead of `chart_path`
+- Remove `kaleido` from dependencies
+
+`bot/tools.py`, `bot/agent.py`, and `bot/slack_handler.py` need minimal changes to handle a URL instead of a file path.
 
 ---
 

@@ -56,8 +56,9 @@ Holds the Anthropic client singleton and model name. The system prompt and agent
 ### `bot/agent.py`
 The brain of the bot. Contains:
 - Full system prompt (bot purpose, tool guidance, response rules, developer/support contact)
-- Tool definitions in Claude's JSON schema format (what each tool does and when to use it)
+- Tool definitions in Claude's JSON schema format (6 tools: search, lookup, system fetch, SQL, forecast, chart)
 - Agentic loop: sends user message to Claude → Claude picks a tool → we execute it → feed result back → repeat until Claude gives a final answer
+- `run()` returns a 3-tuple: `(text_response, chart_path, chart_id)` — chart fields are `None` if no chart was generated
 
 ### `bot/tools.py`
 All tool implementations that Claude can call at runtime:
@@ -65,6 +66,8 @@ All tool implementations that Claude can call at runtime:
 - `get_incident_by_number(number)` — exact lookup by INC number (e.g., INC17089320)
 - `get_all_by_system(system, limit)` — fetch all incidents for a system (bypasses top-k limit)
 - `sql_query(query)` — execute a safe SELECT SQL on Supabase for aggregation and ranking
+- `forecast_incidents(periods, group_by, filters)` — forecast future incident volume using Exponential Smoothing
+- `plot_chart(data, chart_type, x_column, y_column, ...)` — generate a Plotly PNG chart, delegates to `chart_png/`
 - `TOOL_REGISTRY` — dictionary mapping tool names to functions, used by the agent dispatcher
 
 ### `bot/rag_pipeline.py`
@@ -78,7 +81,22 @@ Manages per-thread conversation memory. Abstract base class (storage-agnostic) w
 - Dual storage: `full_content` always saved, `summary` sent to Claude when `use_summary = TRUE`
 
 ### `bot/slack_handler.py`
-Handles Slack events and slash commands using `slack-bolt`. Listens for mentions, DMs, and `/incident` commands. Calls `agent.run()` and sends responses back to Slack.
+Handles Slack events and slash commands using `slack-bolt`. Listens for mentions, DMs, and `/incident` commands. Calls `agent.run()`, posts the text response, and if a chart was generated: uploads the PNG inline and posts an interactive URL link. Cleans up `/tmp` chart files after upload.
+
+---
+
+## chart_png/
+
+Standalone internal package for generating PNG charts. Has zero knowledge of incidents, Slack, or this project — it accepts generic tabular data and chart configuration. Reusable in other projects.
+
+### `chart_png/generator.py`
+Builds a Plotly `Figure` object from data and chart configuration. Supports four chart types: `bar`, `horizontal_bar`, `line`, and `forecast` (historical bars + forecast line overlay). No file I/O — returns a figure object only.
+
+### `chart_png/store.py`
+Saves a Plotly figure to `/tmp/charts/` as both PNG (`kaleido`) and self-contained HTML (`fig.to_html`). Returns the PNG file path and a UUID chart ID. The UUID is shared between both files.
+
+### `chart_png/tool.py`
+Thin wrapper called by Claude via the agentic loop. Calls `generator.py` and `store.py`, returns `{"chart_path": ..., "chart_id": ..., "chart_title": ...}`. This is what gets registered in `TOOL_REGISTRY`.
 
 ---
 
@@ -95,7 +113,7 @@ Run this when switching embedding providers (OpenAI → Voyage or vice versa). F
 ## Root files
 
 ### `main.py`
-FastAPI app entry point. Starts the web server and registers the Slack Bolt app as a handler for incoming webhook events.
+FastAPI app entry point. Starts the web server and launches the Slack socket mode handler in a background thread. Also serves interactive Plotly charts via `GET /charts/{chart_id}` — reads the HTML file from `/tmp/charts/` and returns it as an HTML response.
 
 ### `.env` / `.env.example`
 Environment variables: API keys for Anthropic, OpenAI, Pinecone, Supabase, and Slack. Never commit `.env` to version control.
@@ -104,7 +122,7 @@ Environment variables: API keys for Anthropic, OpenAI, Pinecone, Supabase, and S
 All Python dependencies. Install with `pip install -r requirements.txt`.
 
 ### `Dockerfile`
-Container definition for deployment. Uses Python 3.11 slim image.
+Container definition for deployment. Uses the full `python:3.11` image (not slim) — required because `kaleido` needs system libraries to render Plotly figures to PNG.
 
 ### `railway.toml`
 Railway deployment configuration. Tells Railway to use the Dockerfile and restart on failure.
