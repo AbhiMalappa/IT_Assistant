@@ -25,8 +25,8 @@ def _post_response(say, text: str):
             say(chunk)
 
 
-def _upload_chart(channel: str, chart_path: str, chart_title: str, thread_ts: str = None):
-    """Upload a PNG chart to a Slack channel, optionally in a thread."""
+def _upload_chart(channel: str, chart_path: str, chart_title: str, chart_id: str = None, thread_ts: str = None):
+    """Upload a PNG chart to Slack and optionally post an interactive link."""
     try:
         kwargs = {
             "channel": channel,
@@ -38,8 +38,22 @@ def _upload_chart(channel: str, chart_path: str, chart_title: str, thread_ts: st
             kwargs["thread_ts"] = thread_ts
         app.client.files_upload_v2(**kwargs)
     except Exception as e:
-        # Non-fatal — log and continue; text response was already sent
-        print(f"[chart_upload] Failed to upload chart: {e}")
+        print(f"[chart_upload] Failed to upload chart PNG: {e}")
+
+    # Post interactive URL if APP_URL is configured
+    app_url = os.environ.get("APP_URL", "").rstrip("/")
+    if app_url and chart_id:
+        interactive_url = f"{app_url}/charts/{chart_id}"
+        try:
+            msg_kwargs = {
+                "channel": channel,
+                "text": f"<{interactive_url}|Open interactive chart>",
+            }
+            if thread_ts:
+                msg_kwargs["thread_ts"] = thread_ts
+            app.client.chat_postMessage(**msg_kwargs)
+        except Exception as e:
+            print(f"[chart_upload] Failed to post interactive URL: {e}")
 
 
 def _get_thread_id(event: dict) -> str:
@@ -66,12 +80,12 @@ def handle_mention(event, say):
 
     thread_id = _get_thread_id(event)
     say("Looking into that...")
-    response, chart_path = agent_run(user_message, thread_id=thread_id)
+    response, chart_path, chart_id = agent_run(user_message, thread_id=thread_id)
     _post_response(say, response)
     if chart_path:
         channel = event.get("channel", "")
         thread_ts = event.get("thread_ts") or event.get("ts")
-        _upload_chart(channel, chart_path, "Chart", thread_ts=thread_ts)
+        _upload_chart(channel, chart_path, "Chart", chart_id=chart_id, thread_ts=thread_ts)
 
 
 # --- Direct messages ---
@@ -87,12 +101,12 @@ def handle_dm(event, say):
 
     thread_id = _get_thread_id(event)
     say("Looking into that...")
-    response, chart_path = agent_run(user_message, thread_id=thread_id)
+    response, chart_path, chart_id = agent_run(user_message, thread_id=thread_id)
     _post_response(say, response)
     if chart_path:
         channel = event.get("channel", "")
         thread_ts = event.get("thread_ts") or event.get("ts")
-        _upload_chart(channel, chart_path, "Chart", thread_ts=thread_ts)
+        _upload_chart(channel, chart_path, "Chart", chart_id=chart_id, thread_ts=thread_ts)
 
 
 # --- Slash command: /incident ---
@@ -122,10 +136,10 @@ def handle_incident_command(ack, say, command):
             say("Usage: `/incident search <your question>`")
             return
         say("Searching...")
-        response, chart_path = agent_run(arg, thread_id=thread_id)
+        response, chart_path, chart_id = agent_run(arg, thread_id=thread_id)
         _post_response(say, response)
         if chart_path:
-            _upload_chart(command.get("channel_id", ""), chart_path, "Chart")
+            _upload_chart(command.get("channel_id", ""), chart_path, "Chart", chart_id=chart_id)
 
     elif subcommand == "status":
         if not arg:

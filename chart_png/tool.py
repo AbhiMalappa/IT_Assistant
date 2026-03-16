@@ -10,7 +10,7 @@ This module has zero knowledge of incidents, Slack, or this project.
 from typing import Any, Dict, List, Optional
 
 from chart_png.generator import build_chart
-from chart_png.store import save_png
+from chart_png.store import save
 
 
 def plot_chart(
@@ -49,9 +49,9 @@ def plot_chart(
     Returns
     -------
     dict
-        {"chart_path": str, "chart_title": str}
-        chart_path is the absolute path to the saved PNG — the Slack handler
-        reads this and uploads the file.
+        {"chart_path": str, "chart_id": str, "chart_title": str}
+        chart_path — absolute path to the PNG (Slack handler uploads this)
+        chart_id   — UUID; interactive HTML served at /charts/{chart_id}
     """
     if not data:
         return {"error": "No data provided — cannot generate chart."}
@@ -67,7 +67,7 @@ def plot_chart(
             y_label=y_label,
             forecast_data=forecast_data,
         )
-        path = save_png(fig)
-        return {"chart_path": path, "chart_title": title}
+        png_path, chart_id = save(fig)
+        return {"chart_path": png_path, "chart_id": chart_id, "chart_title": title}
     except Exception as e:
         return {"error": f"Chart generation failed: {e}"}
