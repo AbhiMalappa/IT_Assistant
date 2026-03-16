@@ -1,5 +1,7 @@
 import os
 import re
+import threading
+from pathlib import Path
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -26,7 +28,7 @@ def _post_response(say, text: str):
 
 
 def _upload_chart(channel: str, chart_path: str, chart_title: str, chart_id: str = None, thread_ts: str = None):
-    """Upload a PNG chart to Slack and optionally post an interactive link."""
+    """Upload a PNG chart to Slack, then delete local files to free /tmp space."""
     try:
         kwargs = {
             "channel": channel,
@@ -39,6 +41,12 @@ def _upload_chart(channel: str, chart_path: str, chart_title: str, chart_id: str
         app.client.files_upload_v2(**kwargs)
     except Exception as e:
         print(f"[chart_upload] Failed to upload chart PNG: {e}")
+    finally:
+        # Delete PNG immediately — once uploaded to Slack it's no longer needed
+        try:
+            os.remove(chart_path)
+        except Exception:
+            pass
 
     # Post interactive URL if APP_URL is configured
     app_url = os.environ.get("APP_URL", "").rstrip("/")
@@ -54,6 +62,23 @@ def _upload_chart(channel: str, chart_path: str, chart_title: str, chart_id: str
             app.client.chat_postMessage(**msg_kwargs)
         except Exception as e:
             print(f"[chart_upload] Failed to post interactive URL: {e}")
+
+        # Delete HTML after 10 minutes — long enough to view, frees /tmp space
+        html_path = Path(f"/tmp/charts/{chart_id}.html")
+        def _cleanup(p=html_path):
+            import time
+            time.sleep(600)
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+        threading.Thread(target=_cleanup, daemon=True).start()
+    elif chart_id:
+        # No APP_URL — HTML won't be served, delete immediately
+        try:
+            Path(f"/tmp/charts/{chart_id}.html").unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def _get_thread_id(event: dict) -> str:
@@ -84,7 +109,7 @@ def handle_mention(event, say):
     _post_response(say, response)
     if chart_path:
         channel = event.get("channel", "")
-        thread_ts = event.get("thread_ts") or event.get("ts")
+        thread_ts = event.get("thread_ts")  # only thread if already in a thread
         _upload_chart(channel, chart_path, "Chart", chart_id=chart_id, thread_ts=thread_ts)
 
 
@@ -105,7 +130,7 @@ def handle_dm(event, say):
     _post_response(say, response)
     if chart_path:
         channel = event.get("channel", "")
-        thread_ts = event.get("thread_ts") or event.get("ts")
+        thread_ts = event.get("thread_ts")  # only thread if already in a thread
         _upload_chart(channel, chart_path, "Chart", chart_id=chart_id, thread_ts=thread_ts)
 
 
