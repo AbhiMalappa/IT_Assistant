@@ -100,14 +100,16 @@ def build_chart(
         ))
 
     elif chart_type == "forecast":
-        # Historical bars
-        fig.add_trace(go.Bar(
+        # Historical — solid line
+        fig.add_trace(go.Scatter(
             x=x_vals,
             y=y_vals,
+            mode="lines+markers",
             name="Historical",
-            marker_color=_BLUE,
+            line=dict(color=_BLUE, width=2),
+            marker=dict(size=6),
         ))
-        # Forecast line — connect last historical point for visual continuity
+        # Forecast — dashed line in different colour, connected from last historical point
         if forecast_data:
             fx_vals = [str(row["period"]) for row in forecast_data]
             fy_vals = [row[forecast_y_column] for row in forecast_data]
