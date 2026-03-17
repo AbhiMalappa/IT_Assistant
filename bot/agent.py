@@ -43,6 +43,15 @@ incidents table columns:
 state values: Open, Closed, In Progress, Cancelled, On hold
 priority values: Low, Medium, High, Critical
 
+time_series_metrics table columns:
+  id, metric (TEXT), timestamp (TIMESTAMPTZ), value (NUMERIC), created_at
+
+metric values: store_order_count, api_traffic
+Use this table for questions about store order volume or API traffic over time.
+Always filter by metric name: WHERE metric = 'store_order_count' or WHERE metric = 'api_traffic'.
+The timestamp column is at 15-minute granularity. Use DATE_TRUNC to aggregate (e.g. by hour, day).
+Example: SELECT DATE_TRUNC('hour', timestamp) AS period, SUM(value) AS total FROM time_series_metrics WHERE metric = 'api_traffic' GROUP BY period ORDER BY period
+
 ---
 
 RESPONSE RULES:
@@ -140,12 +149,12 @@ TOOL_DEFINITIONS = [
     {
         "name": "sql_query",
         "description": (
-            "Execute a SELECT SQL query on the incidents database. "
-            "Use for aggregation, counting, ranking, and trend questions like "
-            "'how many open incidents?', 'top 5 printer issues by count', 'which assignment group has the most critical incidents?'. "
-            "Rules: SELECT only. Query the 'incidents' table only. "
-            "Always scope to the past 2 years: include 'opened_at >= NOW() - INTERVAL ''2 years''' in your WHERE clause. "
-            "Always include a LIMIT clause."
+            "Execute a SELECT SQL query on the database. "
+            "Use for aggregation, counting, ranking, and trend questions. "
+            "Allowed tables: 'incidents' and 'time_series_metrics'. "
+            "For incidents: always scope to the past 2 years using 'opened_at >= NOW() - INTERVAL ''2 years'''. "
+            "For time_series_metrics: always filter by metric name (e.g. WHERE metric = 'api_traffic') and use DATE_TRUNC to aggregate by hour or day. "
+            "Rules: SELECT only. Always include a LIMIT clause."
         ),
         "input_schema": {
             "type": "object",
@@ -153,10 +162,12 @@ TOOL_DEFINITIONS = [
                 "query": {
                     "type": "string",
                     "description": (
-                        "A safe SELECT SQL query against the incidents table. "
-                        "Columns: id, number, opened_at, opened_by, state, contact_type, assignment_group, "
+                        "A safe SELECT SQL query. "
+                        "incidents columns: id, number, opened_at, opened_by, state, contact_type, assignment_group, "
                         "assigned_to, priority, configuration_item, resolution_tier, short_description, "
-                        "caller, label, resolution_notes, created_at, updated_at."
+                        "caller, label, resolution_notes, created_at, updated_at. "
+                        "time_series_metrics columns: id, metric, timestamp, value, created_at. "
+                        "metric values: store_order_count, api_traffic."
                     )
                 }
             },

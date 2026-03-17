@@ -67,7 +67,7 @@ def get_all_by_system(system: str, limit: int = 100) -> List[Dict]:
     return response.data
 
 
-ALLOWED_TABLES = {"incidents"}  # extend to {"incidents", "changes"} when changes table is added
+ALLOWED_TABLES = {"incidents", "time_series_metrics"}
 DATE_FILTER = "opened_at >= NOW() - INTERVAL '2 years'"
 MAX_ROW_ESTIMATE = 10_000
 
@@ -85,10 +85,14 @@ def _validate_tables(query: str) -> None:
 
 def _inject_date_filter(query: str) -> str:
     """
-    Ensure every query is scoped to the past 1 year.
+    Ensure incidents queries are scoped to the past 2 years.
+    Skips injection for time_series_metrics (uses its own timestamp column).
     If the query already references opened_at, leave it alone.
     Otherwise inject the filter before GROUP BY / ORDER BY / LIMIT / end of query.
     """
+    if "time_series_metrics" in query.lower():
+        return query  # time_series_metrics has its own timestamp column — let Claude filter
+
     if "opened_at" in query.lower():
         return query  # already has a date filter
 

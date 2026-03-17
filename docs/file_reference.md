@@ -130,6 +130,9 @@ One-time data loading script. Reads `Inputs/IT_Incidents_v1.csv` and inserts all
 ### `scripts/re_embed.py`
 Run this when switching embedding providers (OpenAI → Voyage or vice versa). Fetches all incidents from Supabase, re-embeds them using the new provider, and upserts the new vectors into Pinecone.
 
+### `scripts/load_metrics.py`
+One-time data loading script. Reads `Inputs/store_order_count.csv` and `Inputs/api_traffic.csv` and inserts all records into the Supabase `time_series_metrics` table. Already run — no need to run again unless re-loading fresh data.
+
 ---
 
 ## Root files
@@ -155,3 +158,9 @@ Railway deployment configuration. Tells Railway to use the Dockerfile and restar
 
 ### `Inputs/IT_Incidents_v1.csv`
 Source data file. Contains 510 IT incident records. Already loaded into Supabase. One duplicate INC number was renamed to `INC-DUP-00001` during load.
+
+### `Inputs/store_order_count.csv`
+15-minute store order count metrics. 2,869 rows covering Feb–Mar 2026. Already loaded into `time_series_metrics` (metric = `store_order_count`).
+
+### `Inputs/api_traffic.csv`
+15-minute API traffic metrics. 2,874 rows covering Feb–Mar 2026. Already loaded into `time_series_metrics` (metric = `api_traffic`).

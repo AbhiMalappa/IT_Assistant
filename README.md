@@ -226,6 +226,7 @@ IT_Assistant/
 │   └── conversation_messages.py # Conversation memory CRUD
 ├── scripts/
 │   ├── load_incidents.py        # Load CSV incidents into Supabase
+│   ├── load_metrics.py          # Load store_order_count + api_traffic CSVs into time_series_metrics
 │   ├── re_embed.py              # Batch re-embed all incidents into Pinecone
 │   └── sync_incidents.py        # Delta sync — CSV → Supabase → Pinecone (MD5 hash-based)
 ├── migrations/
@@ -235,7 +236,9 @@ IT_Assistant/
 │   ├── conversation_memory.md   # Conversation memory architecture
 │   └── tools/                   # Per-tool documentation
 ├── Inputs/
-│   └── IT_Incidents_v1.csv      # Source incident data
+│   ├── IT_Incidents_v1.csv      # Source incident data (510 records)
+│   ├── store_order_count.csv    # 15-min store order counts — loaded into time_series_metrics
+│   └── api_traffic.csv          # 15-min API traffic counts — loaded into time_series_metrics
 ├── .env.example                 # All required environment variables
 ├── requirements.txt             # Python dependencies
 ├── Dockerfile                   # Full python:3.11 image (kaleido requires system libs)

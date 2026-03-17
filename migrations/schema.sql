@@ -57,6 +57,22 @@ CREATE TABLE conversation_messages (
 CREATE INDEX idx_thread_id_created ON conversation_messages(thread_id, created_at DESC);
 
 -- ============================================================
+-- time_series_metrics
+-- Source: store_order_count.csv + api_traffic.csv (~5700 records)
+-- Stores timestamped numeric metrics from any source
+-- ============================================================
+CREATE TABLE time_series_metrics (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    metric      TEXT NOT NULL,          -- e.g. store_order_count, api_traffic
+    timestamp   TIMESTAMPTZ NOT NULL,
+    value       NUMERIC NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (metric, timestamp)
+);
+
+CREATE INDEX idx_metrics_metric_ts ON time_series_metrics(metric, timestamp);
+
+-- ============================================================
 -- changes (planned — schema TBD when change data is available)
 -- ============================================================
 -- CREATE TABLE changes ( ... );

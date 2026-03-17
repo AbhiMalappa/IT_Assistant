@@ -64,7 +64,7 @@ IT_Assistant/
 │   ├── load_incidents.py              # One-time CSV loader — already run
 │   └── re_embed.py                    # Re-embed all incidents when switching providers
 ├── migrations/
-│   └── schema.sql                     # Full Supabase schema (incidents + conversation_messages)
+│   └── schema.sql                     # Full Supabase schema (incidents + conversation_messages + time_series_metrics)
 ├── docs/
 │   └── file_reference.md             # Plain English guide to every file
 ├── Inputs/
@@ -288,6 +288,17 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER incidents_updated_at BEFORE UPDATE ON incidents
 FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+CREATE TABLE time_series_metrics (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    metric      TEXT NOT NULL,          -- e.g. store_order_count, api_traffic
+    timestamp   TIMESTAMPTZ NOT NULL,
+    value       NUMERIC NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (metric, timestamp)
+);
+
+CREATE INDEX idx_metrics_metric_ts ON time_series_metrics(metric, timestamp);
+
 -- NOTE: changes and incident_changes tables to be added later when change request data is available.
 ```
 
@@ -472,7 +483,7 @@ Key details:
 
 Build in this sequence:
 
-1. `migrations/schema.sql` — Supabase schema (incidents + conversation_messages)
+1. `migrations/schema.sql` — Supabase schema (incidents + conversation_messages + time_series_metrics)
 2. `db/supabase_client.py` + `db/incidents.py` — DB layer
 3. `embeddings/base.py` + `embeddings/openai_embedder.py` + `embeddings/voyage_embedder.py`
 4. `vectorstore/base.py` + `vectorstore/pinecone_store.py`
