@@ -405,6 +405,23 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
     chart_id: Optional[str] = None
     chart_title: Optional[str] = None
 
+    # Full sql_query result — stored so plot_chart always gets all rows,
+    # even though Claude only sees a capped version to stay within token limits.
+    _full_sql_result: Optional[list] = None
+    SQL_RESULT_CAP = 100  # max rows returned to Claude; full dataset injected into plot_chart
+
+    def _save_assistant(content: str) -> None:
+        if thread_id:
+            conversation_manager.save_message(
+                thread_id=thread_id,
+                role="assistant",
+                content=content,
+                tool_used=primary_tool,
+                tool_input=primary_tool_input,
+                tool_result=primary_tool_result,
+                sql_query=primary_sql,
+            )
+
     while True:
         response = client.messages.create(
             model=MODEL,
@@ -422,18 +439,7 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
                     final_text = block.text
                     break
             final_text = final_text or "I couldn't generate a response. Please try again."
-
-            if thread_id:
-                conversation_manager.save_message(
-                    thread_id=thread_id,
-                    role="assistant",
-                    content=final_text,
-                    tool_used=primary_tool,
-                    tool_input=primary_tool_input,
-                    tool_result=primary_tool_result,
-                    sql_query=primary_sql,
-                )
-
+            _save_assistant(final_text)
             return final_text, chart_path, chart_id
 
         # Claude wants to use tools
@@ -443,7 +449,25 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    result = _execute_tool(block.name, block.input)
+                    # For plot_chart: inject the full sql result as data so the chart
+                    # gets all rows, not just the capped version Claude saw.
+                    inputs = dict(block.input)
+                    if block.name == "plot_chart" and _full_sql_result is not None:
+                        inputs["data"] = _full_sql_result
+
+                    result = _execute_tool(block.name, inputs)
+
+                    # After sql_query: store full result, cap what Claude sees
+                    if block.name == "sql_query":
+                        try:
+                            rows = json.loads(result)
+                            if isinstance(rows, list) and len(rows) > SQL_RESULT_CAP:
+                                _full_sql_result = rows
+                                result = json.dumps(rows[:SQL_RESULT_CAP], default=str)
+                            elif isinstance(rows, list):
+                                _full_sql_result = rows
+                        except Exception:
+                            pass
 
                     # Track the first tool called in this turn
                     if primary_tool is None:
@@ -473,6 +497,10 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
             messages.append({"role": "user", "content": tool_results})
 
         elif response.stop_reason == "max_tokens":
-            return "The response was too long to complete. Try a more specific query or a shorter time range.", None, None
+            msg = "The response was too long to complete. Try a more specific query or a shorter time range."
+            _save_assistant(msg)
+            return msg, None, None
         else:
-            return "Unexpected response from AI. Please try again.", None, None
+            msg = "Unexpected response from AI. Please try again."
+            _save_assistant(msg)
+            return msg, None, None
