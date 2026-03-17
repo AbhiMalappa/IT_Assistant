@@ -408,7 +408,7 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
     while True:
         response = client.messages.create(
             model=MODEL,
-            max_tokens=2048,
+            max_tokens=8192,
             system=SYSTEM_PROMPT,
             tools=TOOL_DEFINITIONS,
             messages=messages,
@@ -472,5 +472,7 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
 
             messages.append({"role": "user", "content": tool_results})
 
+        elif response.stop_reason == "max_tokens":
+            return "The response was too long to complete. Try a more specific query or a shorter time range.", None, None
         else:
             return "Unexpected response from AI. Please try again.", None, None
