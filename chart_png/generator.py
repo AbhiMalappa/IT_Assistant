@@ -71,7 +71,7 @@ def build_chart(
     y_label = y_label or y_column
 
     x_vals = [str(row[x_column]) for row in data]
-    y_vals = [row[y_column] for row in data]
+    y_vals = [float(row[y_column]) if row[y_column] is not None else 0.0 for row in data]
 
     fig = go.Figure()
 
@@ -116,7 +116,7 @@ def build_chart(
         # Model predictions (in-sample fit + future forecast) — orange dashed line
         if forecast_data:
             fx_vals = [str(row["period"]) for row in forecast_data]
-            fy_vals = [row[forecast_y_column] for row in forecast_data]
+            fy_vals = [float(row[forecast_y_column]) if row[forecast_y_column] is not None else 0.0 for row in forecast_data]
             fig.add_trace(go.Scatter(
                 x=fx_vals,
                 y=fy_vals,
@@ -139,7 +139,7 @@ def build_chart(
         # Anomalous points — red X markers overlaid on the line
         if anomaly_data:
             ax_vals = [str(row[x_column]) for row in anomaly_data]
-            ay_vals = [row[y_column] for row in anomaly_data]
+            ay_vals = [float(row[y_column]) if row[y_column] is not None else 0.0 for row in anomaly_data]
             fig.add_trace(go.Scatter(
                 x=ax_vals,
                 y=ay_vals,
