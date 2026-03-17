@@ -12,6 +12,9 @@ Built by Abhiraj Malappa. Support: abhiraj7m@gmail.com
 - **Exact lookup** — "what is the status of INC17089320?"
 - **Aggregation** — "top 5 printer issues", "how many open critical incidents?"
 - **Full system view** — "give me all SAP incidents"
+- **Forecasting** — "how many incidents next month?", "predict SAP volume for next quarter"
+- **Anomaly detection** — "are there any unusual spikes in incident volume?", "detect anomalies in network incidents"
+- **Charts** — bar, line, horizontal bar, forecast, and anomaly charts posted inline in Slack with an interactive Plotly link
 - **Conversation memory** — follow-up questions work across turns
 
 ---
@@ -62,9 +65,12 @@ Add these under **Bot Token Scopes**:
 - `channels:history`
 - `chat:write`
 - `commands`
+- `files:write`
 - `im:history`
 - `im:read`
 - `im:write`
+
+> `files:write` is required for posting charts inline in Slack. After adding it, reinstall the app to your workspace.
 
 ### Event Subscriptions
 Enable **Event Subscriptions** and subscribe to bot events:
@@ -138,6 +144,9 @@ The bot connects to Slack via socket mode. You should see `⚡️ Bolt app is ru
 how many open critical incidents are there?
 all incidents for the network team
 summarize INC17089043
+forecast incidents for next 3 months
+are there any anomalies in monthly incident volume?
+show me incidents by priority
 ```
 
 **Slash commands:**
@@ -156,8 +165,9 @@ summarize INC17089043
 2. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**.
 3. Select your repository.
 4. Go to **Variables** and add all environment variables from `.env.example`.
-5. Railway will detect `railway.toml` and build from the `Dockerfile`.
-6. Once deployed, Railway provides a public URL — you can use this for Slack's webhook URL if switching from socket mode.
+5. Set `APP_URL` to your Railway public URL (e.g. `https://itassistant-production-xxxx.up.railway.app`) — enables interactive Plotly chart links alongside inline PNG charts.
+6. Railway will detect `railway.toml` and build from the `Dockerfile`.
+7. Once deployed, Railway provides a public URL — you can use this for Slack's webhook URL if switching from socket mode.
 
 > For production, switch from socket mode to HTTP mode by setting up Slack's **Event Subscriptions** URL to `https://your-railway-url/slack/events`.
 
@@ -183,14 +193,26 @@ No other code changes needed.
 
 ```
 IT_Assistant/
-├── main.py                      # FastAPI entry point + Slack socket mode startup
+├── main.py                      # FastAPI entry point + Slack socket mode + /charts/{id} endpoint
 ├── bot/
-│   ├── agent.py                 # Agentic loop — Claude picks tools at runtime
-│   ├── tools.py                 # Tool implementations (search, SQL, lookup, system fetch)
-│   ├── slack_handler.py         # Slack Bolt event handling (mentions, DMs, slash commands)
+│   ├── agent.py                 # Agentic loop — Claude picks tools at runtime (8 tools)
+│   ├── tools.py                 # Tool implementations (search, SQL, lookup, forecast, anomaly, chart)
+│   ├── slack_handler.py         # Slack Bolt event handling — posts text + uploads PNG charts
 │   ├── conversation_manager.py  # Token-aware conversation memory (Supabase-backed)
 │   ├── claude_client.py         # Anthropic client singleton
 │   └── rag_pipeline.py          # Legacy RAG pipeline (superseded by agent + tools)
+├── anomaly_detection/           # Standalone anomaly detection package (no project knowledge)
+│   ├── analyser.py              # Pre-flight checks, seasonality/trend detection, method options
+│   ├── threshold.py             # Auto Z-score threshold (3–9) based on noise level
+│   ├── detector.py              # STL / MSTL / rolling Z-score + IQR capping
+│   └── tool.py                  # analyse_for_anomalies() + run_anomaly_detection() wrappers
+├── chart_png/                   # Standalone chart generation package (no project knowledge)
+│   ├── generator.py             # Plotly figure builder (bar, line, forecast, anomaly)
+│   ├── store.py                 # Saves PNG + HTML to /tmp/charts/
+│   └── tool.py                  # plot_chart() wrapper
+├── forecasting/                 # Standalone forecasting package
+│   ├── forecaster.py            # Exponential Smoothing model selection by MSE
+│   └── tool.py                  # forecast_incidents() wrapper
 ├── embeddings/
 │   ├── base.py                  # Abstract BaseEmbedder
 │   ├── openai_embedder.py       # OpenAI text-embedding-3-large
@@ -204,16 +226,19 @@ IT_Assistant/
 │   └── conversation_messages.py # Conversation memory CRUD
 ├── scripts/
 │   ├── load_incidents.py        # Load CSV incidents into Supabase
-│   └── re_embed.py              # Batch re-embed all incidents into Pinecone
+│   ├── re_embed.py              # Batch re-embed all incidents into Pinecone
+│   └── sync_incidents.py        # Delta sync — CSV → Supabase → Pinecone (MD5 hash-based)
 ├── migrations/
 │   └── schema.sql               # Full Supabase schema
 ├── docs/
-│   └── file_reference.md        # Plain English guide to every file
+│   ├── file_reference.md        # Plain English guide to every file
+│   ├── conversation_memory.md   # Conversation memory architecture
+│   └── tools/                   # Per-tool documentation
 ├── Inputs/
 │   └── IT_Incidents_v1.csv      # Source incident data
 ├── .env.example                 # All required environment variables
 ├── requirements.txt             # Python dependencies
-├── Dockerfile                   # For Railway deployment
+├── Dockerfile                   # Full python:3.11 image (kaleido requires system libs)
 ├── railway.toml                 # Railway configuration
 └── CLAUDE.md                    # Full architecture and decisions log
 ```
@@ -236,5 +261,6 @@ IT_Assistant/
 | `SLACK_BOT_TOKEN` | Slack bot OAuth token (`xoxb-...`) |
 | `SLACK_SIGNING_SECRET` | Slack app signing secret |
 | `SLACK_APP_TOKEN` | Slack app-level token for socket mode (`xapp-...`) |
+| `APP_URL` | Public URL of the deployed app (e.g. Railway URL) — enables interactive Plotly chart links |
 | `PORT` | Port to run on (default: `8000`) |
 | `ENVIRONMENT` | `development` or `production` |
