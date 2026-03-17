@@ -22,6 +22,7 @@ def plot_chart(
     x_label: str = "",
     y_label: str = "",
     forecast_data: Optional[List[Dict[str, Any]]] = None,
+    anomaly_data: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Generate a PNG chart from tabular data.
@@ -66,6 +67,7 @@ def plot_chart(
             x_label=x_label,
             y_label=y_label,
             forecast_data=forecast_data,
+            anomaly_data=anomaly_data,
         )
         png_path, chart_id = save(fig)
         return {"chart_path": png_path, "chart_id": chart_id, "chart_title": title}

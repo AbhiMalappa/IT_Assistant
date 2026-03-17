@@ -32,6 +32,7 @@ def build_chart(
     y_label: str = "",
     forecast_data: Optional[List[Dict[str, Any]]] = None,
     forecast_y_column: str = "forecasted_count",
+    anomaly_data: Optional[List[Dict[str, Any]]] = None,
 ) -> go.Figure:
     """
     Build a Plotly Figure for the given data and chart type.
@@ -41,7 +42,7 @@ def build_chart(
     data : list of dicts
         Row data. Each dict must contain x_column and y_column keys.
     chart_type : str
-        One of: "bar", "line", "horizontal_bar", "forecast"
+        One of: "bar", "line", "horizontal_bar", "forecast", "anomaly"
     x_column : str
         Column name to use for the x-axis (or y-axis for horizontal_bar).
     y_column : str
@@ -55,6 +56,9 @@ def build_chart(
     forecast_data : list of dicts, optional
         Forecast rows for the "forecast" chart type.
         Each dict must have "period" and forecast_y_column keys.
+    anomaly_data : list of dicts, optional
+        Anomalous points for the "anomaly" chart type.
+        Same column structure as data — anomalies are highlighted as red markers.
     forecast_y_column : str
         Key in forecast_data dicts that holds the forecasted value.
         Default "forecasted_count".
@@ -122,10 +126,32 @@ def build_chart(
                 marker=dict(size=5),
             ))
 
+    elif chart_type == "anomaly":
+        # Full actual series — solid blue line
+        fig.add_trace(go.Scatter(
+            x=x_vals,
+            y=y_vals,
+            mode="lines+markers",
+            name="Actual",
+            line=dict(color=_BLUE, width=2),
+            marker=dict(size=5),
+        ))
+        # Anomalous points — red X markers overlaid on the line
+        if anomaly_data:
+            ax_vals = [str(row[x_column]) for row in anomaly_data]
+            ay_vals = [row[y_column] for row in anomaly_data]
+            fig.add_trace(go.Scatter(
+                x=ax_vals,
+                y=ay_vals,
+                mode="markers",
+                name="Anomaly",
+                marker=dict(color="red", size=12, symbol="x", line=dict(width=2)),
+            ))
+
     else:
         raise ValueError(
             f"Unknown chart_type: '{chart_type}'. "
-            "Use: bar, line, horizontal_bar, forecast"
+            "Use: bar, line, horizontal_bar, forecast, anomaly"
         )
 
     fig.update_layout(

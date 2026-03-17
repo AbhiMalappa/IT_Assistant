@@ -161,6 +161,7 @@ def sql_query(query: str) -> List[Dict]:
 
 from forecasting.forecaster import ExponentialSmoothingForecaster
 from chart_png.tool import plot_chart
+from anomaly_detection.tool import analyse_for_anomalies, run_anomaly_detection
 
 SUPPORTED_FILTERS = {"priority", "state", "assignment_group", "configuration_item", "label"}
 SUPPORTED_INTERVALS = {"month", "week"}
@@ -301,4 +302,6 @@ TOOL_REGISTRY = {
     "sql_query": sql_query,
     "forecast_incidents": forecast_incidents,
     "plot_chart": plot_chart,
+    "analyse_for_anomalies": analyse_for_anomalies,
+    "run_anomaly_detection": run_anomaly_detection,
 }

@@ -31,6 +31,8 @@ TOOLS — choose based on the question:
 - get_all_by_system: full dataset for a system. Use when the user wants ALL incidents for a system, not just the top few.
 - sql_query: aggregation and ranking. Use for counts, rankings, trends, averages. Write safe SELECT queries against the incidents table.
 - forecast_incidents: predict future incident volume using exponential smoothing. Use for any forward-looking volume question ("next month", "next quarter", "predict", "forecast", "expected volume"). Supports optional filters by priority, state, assignment_group, configuration_item, or label.
+- analyse_for_anomalies: inspect a time series and return data characteristics + method options. Call this FIRST when the user asks about anomalies, spikes, unusual patterns, or outliers in incident volume. Present the method options to the user and wait for their choice before running detection.
+- run_anomaly_detection: run anomaly detection on a time series using the chosen method. Call this AFTER the user selects a method from analyse_for_anomalies results. Then call plot_chart with chart_type="anomaly".
 - plot_chart: generate a PNG chart from tabular data and post it in Slack. Call this after sql_query or forecast_incidents when a visual would genuinely help the user understand the data. Do NOT call it for single-row results, text lookups, or search results.
 
 incidents table columns:
@@ -53,7 +55,11 @@ RESPONSE RULES:
 7. For greetings or general questions, respond conversationally and guide the user toward asking about incidents.
 8. If a user reports a bug or wants to give feedback, provide the support contact: abhiraj7m@gmail.com
 9. For forecast results: state the model used, show the forecasted values per period, and include the MSE so the user knows the accuracy. If R² is negative, briefly note that it reflects limited historical data, not a broken model.
-10. Charting — call plot_chart when the data is clearly visual:
+10. Anomaly detection — two-step flow:
+    Step 1: call analyse_for_anomalies with the series data. Present method options to user exactly as returned (key, label, description). Mark the recommended option. Ask user to pick a letter, "auto", or "go with recommendation".
+    Step 2: once user replies, call run_anomaly_detection with method=chosen. Then call plot_chart with chart_type="anomaly", passing the original series as data and anomalies list as anomaly_data (map period→x_column, actual→y_column).
+    Report: method used, threshold, anomaly count, each flagged period with actual value and z_score. Include any warnings (sparsity, capped outliers).
+11. Charting — call plot_chart when the data is clearly visual:
     - After sql_query: call plot_chart if result has multiple rows with a categorical or date/period column + a numeric column. Use "bar" for categorical breakdowns (state, priority, assignment_group), "horizontal_bar" for ranked lists, "line" for time series by month/week.
     - After forecast_incidents: always call plot_chart with chart_type="forecast", passing historical_data as data, all_predictions as forecast_data, x_column="period", y_column="count". This produces a solid blue actual line and an orange dashed model/forecast line covering all periods.
     - Do NOT call plot_chart for: single-row results, search_incidents results, get_incident_by_number results, or get_all_by_system results.
@@ -194,6 +200,79 @@ TOOL_DEFINITIONS = [
         }
     },
     {
+        "name": "analyse_for_anomalies",
+        "description": (
+            "Analyse a time series and return data characteristics plus method options for anomaly detection. "
+            "Call this FIRST when the user asks about anomalies, spikes, or unusual patterns. "
+            "Present the returned method options to the user and wait for their choice."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "series_data": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "List of row dicts with period and value columns. Typically from a sql_query result."
+                },
+                "period_column": {
+                    "type": "string",
+                    "description": "Column name for the time period (e.g. 'period', 'month', 'opened_at')."
+                },
+                "value_column": {
+                    "type": "string",
+                    "description": "Column name for the numeric value to analyse (e.g. 'count', 'total')."
+                },
+                "periods_hint": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Optional known seasonal periods to override auto-detection (e.g. [12] for monthly yearly seasonality)."
+                }
+            },
+            "required": ["series_data", "period_column", "value_column"]
+        }
+    },
+    {
+        "name": "run_anomaly_detection",
+        "description": (
+            "Run anomaly detection on a time series using the method chosen by the user. "
+            "Call this AFTER the user selects a method from analyse_for_anomalies. "
+            "Then call plot_chart with chart_type='anomaly' to visualise results."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "series_data": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Same series data passed to analyse_for_anomalies."
+                },
+                "period_column": {
+                    "type": "string",
+                    "description": "Column name for the time period."
+                },
+                "value_column": {
+                    "type": "string",
+                    "description": "Column name for the numeric value."
+                },
+                "method": {
+                    "type": "string",
+                    "enum": ["stl", "mstl", "rolling_zscore", "auto"],
+                    "description": "Method chosen by user. 'auto' selects the best method automatically."
+                },
+                "threshold": {
+                    "type": "number",
+                    "description": "Z-score threshold for flagging anomalies. Auto-selected based on noise level if not provided."
+                },
+                "seasonal_periods": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Override detected seasonal periods if needed."
+                }
+            },
+            "required": ["series_data", "period_column", "value_column", "method"]
+        }
+    },
+    {
         "name": "plot_chart",
         "description": (
             "Generate a PNG chart from tabular data and post it in Slack. "
@@ -214,12 +293,13 @@ TOOL_DEFINITIONS = [
                 },
                 "chart_type": {
                     "type": "string",
-                    "enum": ["bar", "line", "horizontal_bar", "forecast"],
+                    "enum": ["bar", "line", "horizontal_bar", "forecast", "anomaly"],
                     "description": (
                         "bar: vertical bars for categorical breakdowns (state, priority, assignment_group). "
                         "horizontal_bar: horizontal bars for ranked lists (top N). "
                         "line: time series by month or week. "
-                        "forecast: historical bars + forecast line overlay."
+                        "forecast: solid actual line + dashed model/forecast line. "
+                        "anomaly: actual line with red X markers at anomalous points."
                     )
                 },
                 "x_column": {
@@ -250,6 +330,15 @@ TOOL_DEFINITIONS = [
                         "Pass all_predictions from forecast_incidents result — this contains "
                         "in-sample fitted values for all historical periods plus the future forecast. "
                         "Each dict has 'period' and 'forecasted_count' keys."
+                    )
+                },
+                "anomaly_data": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": (
+                        "For chart_type='anomaly' only. "
+                        "Pass the anomalies list from run_anomaly_detection. "
+                        "Each dict must have 'period' and 'actual' keys — these map to x_column and y_column."
                     )
                 }
             },
