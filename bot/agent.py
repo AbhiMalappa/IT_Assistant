@@ -449,11 +449,14 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    # For plot_chart: inject the full sql result as data so the chart
-                    # gets all rows, not just the capped version Claude saw.
+                    # Inject the full sql result so tools always get all rows,
+                    # not just the capped version Claude saw.
                     inputs = dict(block.input)
-                    if block.name == "plot_chart" and _full_sql_result is not None:
-                        inputs["data"] = _full_sql_result
+                    if _full_sql_result is not None:
+                        if block.name == "plot_chart":
+                            inputs["data"] = _full_sql_result
+                        elif block.name in ("analyse_for_anomalies", "run_anomaly_detection"):
+                            inputs["series_data"] = _full_sql_result
 
                     result = _execute_tool(block.name, inputs)
 
