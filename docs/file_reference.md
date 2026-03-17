@@ -68,6 +68,8 @@ All tool implementations that Claude can call at runtime:
 - `sql_query(query)` — execute a safe SELECT SQL on Supabase for aggregation and ranking
 - `forecast_incidents(periods, group_by, filters)` — forecast future incident volume using Exponential Smoothing
 - `plot_chart(data, chart_type, x_column, y_column, ...)` — generate a Plotly PNG chart, delegates to `chart_png/`
+- `analyse_for_anomalies(series_data, period_column, value_column)` — inspect series, return method options, delegates to `anomaly_detection/`
+- `run_anomaly_detection(series_data, period_column, value_column, method)` — run detection, return flagged anomalies, delegates to `anomaly_detection/`
 - `TOOL_REGISTRY` — dictionary mapping tool names to functions, used by the agent dispatcher
 
 ### `bot/rag_pipeline.py`
@@ -82,6 +84,26 @@ Manages per-thread conversation memory. Abstract base class (storage-agnostic) w
 
 ### `bot/slack_handler.py`
 Handles Slack events and slash commands using `slack-bolt`. Listens for mentions, DMs, and `/incident` commands. Calls `agent.run()`, posts the text response, and if a chart was generated: uploads the PNG inline and posts an interactive URL link. Cleans up `/tmp` chart files after upload.
+
+---
+
+## anomaly_detection/
+
+Standalone internal package for time series anomaly detection. Zero knowledge of incidents, Slack, or this project — accepts any numeric pandas Series. Reusable in other projects.
+
+### `anomaly_detection/analyser.py`
+Inspects a time series before running detection. Performs pre-flight checks (hard stops + warnings), infers granularity from index labels, detects trend (linear regression) and seasonality (ACF), and builds a ranked list of viable method options with a recommended pick.
+
+### `anomaly_detection/threshold.py`
+Auto-selects a Z-score threshold in the range 3.0–9.0 based on the Coefficient of Variation (CV) of residuals. Low noise → tight threshold (3.0). Very noisy data → loose threshold (9.0) to reduce false positives.
+
+### `anomaly_detection/detector.py`
+Runs anomaly detection. Caps extreme outliers via IQR before model fitting (originals used for scoring), fits STL/MSTL/rolling Z-score decomposition, computes Z-scores on residuals, and returns flagged anomalies with actual value, expected value, Z-score, and direction (spike/drop).
+
+### `anomaly_detection/tool.py`
+Two thin wrappers registered in `TOOL_REGISTRY` for Claude:
+- `analyse_for_anomalies(series_data, period_column, value_column)` — returns characteristics + method options
+- `run_anomaly_detection(series_data, period_column, value_column, method)` — runs detection, returns flagged anomalies
 
 ---
 

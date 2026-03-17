@@ -49,6 +49,12 @@ IT_Assistant/
 │   ├── supabase_client.py             # Supabase client singleton
 │   ├── incidents.py                   # CRUD operations for incidents table
 │   └── conversation_messages.py       # [planned] CRUD for conversation_messages table
+├── anomaly_detection/
+│   ├── __init__.py
+│   ├── analyser.py                    # Pre-flight checks, granularity/trend/seasonality detection, method options
+│   ├── threshold.py                   # Auto-suggest Z-score threshold (3–9) based on noise level (CV)
+│   ├── detector.py                    # IQR capping + STL/MSTL/rolling Z-score + anomaly flagging
+│   └── tool.py                        # analyse_for_anomalies() + run_anomaly_detection() wrappers
 ├── chart_png/
 │   ├── __init__.py
 │   ├── generator.py                   # Builds Plotly Figure from data + chart config (no project knowledge)
@@ -86,6 +92,8 @@ Agent (agent.py)  ←── Claude decides which tool(s) to call at runtime
      ├── sql_query()               → Supabase (aggregation, counts, ranking)
      ├── get_all_by_system()       → Supabase (all incidents for a system)
      ├── forecast_incidents()      → Supabase + ExponentialSmoothingForecaster
+     ├── analyse_for_anomalies()   → anomaly_detection/analyser.py (presents method options)
+     ├── run_anomaly_detection()   → anomaly_detection/detector.py (STL/MSTL/rolling Z-score)
      └── plot_chart()              → chart_png → /tmp/charts/*.png
           ↓
      Claude formulates final answer
@@ -452,6 +460,7 @@ Key details:
 | Relational DB | Supabase (Postgres) | Simple managed Postgres, no pgvector needed |
 | Deployment | Railway | Zero DevOps, small team, fast iteration |
 | Charting | Plotly PNG via `chart_png/` | Inline in Slack, no server dependency, ephemeral /tmp storage |
+| Anomaly Detection | STL/MSTL/rolling Z-score via `anomaly_detection/` | Two-step flow: analyse → user picks method → run. IQR capping, auto threshold (3–9) |
 | Agent Pattern | Claude tool-use | Claude decides RAG vs SQL vs direct lookup at runtime — no hardcoded intent classifier |
 | Aggregation | Text-to-SQL via psycopg2 | Pure RAG misses full dataset; SQL handles counts, rankings, trends correctly |
 | Conversation Memory | Supabase (swappable) | Token-aware buffer, dual storage (full + summary), tool tracking per message |
