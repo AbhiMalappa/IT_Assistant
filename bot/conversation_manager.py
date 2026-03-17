@@ -6,8 +6,8 @@ Architecture:
 - SupabaseConversationManager: Supabase implementation
 
 Buffer strategy:
-- Window: last 10 turns (20 messages)
-- Token budget: 4000 tokens max for injected history
+- Window: last 5 turns (10 messages)
+- Token budget: 2000 tokens max for injected history
 - Order: most recent first, work backwards until budget exceeded
 - Token count stored at write time — no re-counting on retrieval
 
@@ -29,8 +29,8 @@ from bot.claude_client import client, MODEL
 
 SUMMARISE_TOOLS = {"sql_query", "get_all_by_system", "forecast_incidents"}
 TOKEN_THRESHOLD = 300
-BUFFER_TOKEN_BUDGET = 4000
-BUFFER_TURN_LIMIT = 20  # 10 turns = 20 messages
+BUFFER_TOKEN_BUDGET = 2000
+BUFFER_TURN_LIMIT = 10  # 5 turns = 10 messages
 
 
 def _count_tokens(text: str) -> int:
