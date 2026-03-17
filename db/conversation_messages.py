@@ -9,6 +9,11 @@ def save(row: Dict[str, Any]) -> Dict:
     return response.data[0]
 
 
+def delete_thread(thread_id: str) -> None:
+    """Delete all messages for a thread — used by /incident reset."""
+    supabase.table("conversation_messages").delete().eq("thread_id", thread_id).execute()
+
+
 def get_recent(thread_id: str, limit: int = 20) -> List[Dict]:
     """
     Fetch the most recent messages for a thread, newest first.

@@ -6,6 +6,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from bot.agent import run as agent_run
+from bot.conversation_manager import conversation_manager
 from db import incidents as db
 
 app = App(token=os.environ["SLACK_BOT_TOKEN"])
@@ -145,7 +146,8 @@ def handle_incident_command(ack, say, command):
             "*IT Assistant commands:*\n"
             "• `/incident search <query>` — search past incidents\n"
             "• `/incident status <INC number>` — get status of a specific incident\n"
-            "• `/incident summary <INC number>` — plain English summary of an incident"
+            "• `/incident summary <INC number>` — plain English summary of an incident\n"
+            "• `/incident reset` — clear conversation memory and start fresh"
         )
         return
 
@@ -201,6 +203,14 @@ def handle_incident_command(ack, say, command):
         )
         response, _ = agent_run(summary_prompt, thread_id=thread_id)
         _post_response(say, response)
+
+    elif subcommand == "reset":
+        thread_id = f"slash_{command.get('channel_id', 'unknown')}_{command.get('user_id', '')}"
+        try:
+            conversation_manager.reset(thread_id)
+            say("Conversation memory cleared. Starting fresh.")
+        except Exception as e:
+            say(f"Failed to reset memory: {e}")
 
     else:
         say(f"Unknown subcommand `{subcommand}`. Try `/incident help`.")

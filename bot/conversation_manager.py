@@ -134,11 +134,19 @@ class BaseConversationManager(ABC):
         """Return True if this message's content should be summarised."""
         pass
 
+    @abstractmethod
+    def reset(self, thread_id: str) -> None:
+        """Delete all conversation history for a thread."""
+        pass
+
 
 class SupabaseConversationManager(BaseConversationManager):
 
     def should_summarise(self, tool_used: Optional[str], token_count: int) -> bool:
         return (tool_used in SUMMARISE_TOOLS) or (token_count > TOKEN_THRESHOLD)
+
+    def reset(self, thread_id: str) -> None:
+        db.delete_thread(thread_id)
 
     def save_message(
         self,
