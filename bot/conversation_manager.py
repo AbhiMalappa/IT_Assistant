@@ -11,24 +11,25 @@ Buffer strategy:
 - Order: most recent first, work backwards until budget exceeded
 - Token count stored at write time — no re-counting on retrieval
 
-Summarisation triggers (use_summary = TRUE):
-- tool_used in {sql_query, get_all_by_system, forecast_incidents}
-- token_count > 300
-
-Summarisation prompt includes tool context (tool name, filters, grouping, SQL query)
-so follow-up questions can reference scope details (e.g. "forecast that for SAP")
-without the summary stripping them out.
+Truncation triggers (use_summary = TRUE, no extra API call):
+- tool_used in TRUNCATE_LIMITS (sql_query/get_all_by_system → 300 tokens, forecast/anomaly → 500 tokens)
+- token_count > TOKEN_THRESHOLD (500)
 """
 
-import json
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
 from db import conversation_messages as db
-from bot.claude_client import client, MODEL
 
-SUMMARISE_TOOLS = {"sql_query", "get_all_by_system", "forecast_incidents"}
-TOKEN_THRESHOLD = 300
+# Truncation limits (in chars, ~4 chars per token) applied per tool instead of LLM summarisation.
+# Tools not listed here are stored in full (responses are already short).
+TRUNCATE_LIMITS = {
+    "sql_query":            1200,   # 300 tokens — aggregation lists fit fine
+    "get_all_by_system":    1200,   # 300 tokens
+    "forecast_incidents":   2000,   # 500 tokens — needs model, values, accuracy
+    "run_anomaly_detection": 2000,  # 500 tokens — needs method, threshold, flagged periods
+}
+TOKEN_THRESHOLD = 500   # fallback: truncate any response exceeding this many tokens
 BUFFER_TOKEN_BUDGET = 2000
 BUFFER_TURN_LIMIT = 10  # 5 turns = 10 messages
 
@@ -40,70 +41,16 @@ def _count_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-def _build_context_hint(tool_used: Optional[str], tool_input: Optional[Dict]) -> str:
+
+def _truncate(content: str, tool_used: Optional[str] = None) -> str:
     """
-    Build a one-line hint for the summarisation prompt that captures the
-    scope of the tool call — so the summary never drops filters, grouping
-    dimensions, or system names that a follow-up question might rely on.
+    Truncate content to the tool-specific char limit.
+    No extra API call — just a string cut with an ellipsis marker.
     """
-    if not tool_used or not tool_input:
-        return ""
-
-    parts = [f"Tool used: {tool_used}."]
-
-    if tool_used == "sql_query":
-        query = tool_input.get("query", "")
-        if query:
-            parts.append(f"SQL query: {query[:300]}")
-
-    elif tool_used == "forecast_incidents":
-        group_by = tool_input.get("group_by", "month")
-        periods = tool_input.get("periods", 3)
-        filters = tool_input.get("filters") or {}
-        parts.append(f"Forecast: next {periods} {group_by}(s).")
-        if filters:
-            parts.append(f"Filters applied: {json.dumps(filters)}.")
-
-    elif tool_used == "get_all_by_system":
-        system = tool_input.get("system", "")
-        if system:
-            parts.append(f"System queried: {system}.")
-
-    elif tool_used == "search_incidents":
-        query = tool_input.get("query", "")
-        filters = tool_input.get("filters") or {}
-        if query:
-            parts.append(f"Search query: '{query}'.")
-        if filters:
-            parts.append(f"Filters: {json.dumps(filters)}.")
-
-    return " ".join(parts)
-
-
-def _summarise(content: str, tool_used: Optional[str] = None, tool_input: Optional[Dict] = None) -> str:
-    """
-    Call Claude to produce a short summary of a response.
-    Injects a context hint so the summary always preserves scope details
-    (system name, filters, grouping) needed for follow-up questions.
-    """
-    context_hint = _build_context_hint(tool_used, tool_input)
-
-    prompt = (
-        f"Summarise this IT assistant response in 2-3 sentences. "
-        f"You MUST preserve: any system or configuration item names, filter values "
-        f"(priority, state, assignment group), grouping dimensions (e.g. by month, by week), "
-        f"key numeric findings, and incident numbers.\n"
-    )
-    if context_hint:
-        prompt += f"\nContext: {context_hint}\n"
-    prompt += f"\nResponse to summarise:\n{content}"
-
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=150,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.content[0].text
+    char_limit = TRUNCATE_LIMITS.get(tool_used, TOKEN_THRESHOLD * 4)
+    if len(content) <= char_limit:
+        return content
+    return content[:char_limit] + "… [truncated]"
 
 
 class BaseConversationManager(ABC):
@@ -143,7 +90,7 @@ class BaseConversationManager(ABC):
 class SupabaseConversationManager(BaseConversationManager):
 
     def should_summarise(self, tool_used: Optional[str], token_count: int) -> bool:
-        return (tool_used in SUMMARISE_TOOLS) or (token_count > TOKEN_THRESHOLD)
+        return (tool_used in TRUNCATE_LIMITS) or (token_count > TOKEN_THRESHOLD)
 
     def reset(self, thread_id: str) -> None:
         db.delete_thread(thread_id)
@@ -163,10 +110,7 @@ class SupabaseConversationManager(BaseConversationManager):
 
         summary = None
         if needs_summary:
-            try:
-                summary = _summarise(content, tool_used=tool_used, tool_input=tool_input)
-            except Exception:
-                summary = content[:300]  # fallback: truncate
+            summary = _truncate(content, tool_used=tool_used)
 
         row = {
             "thread_id": thread_id,
