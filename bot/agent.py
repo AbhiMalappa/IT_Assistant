@@ -6,7 +6,13 @@ from bot.tools import TOOL_REGISTRY
 from bot.conversation_manager import conversation_manager
 
 client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-MODEL = "claude-sonnet-4-20250514"
+
+# Haiku is used by default — cheap and fast for tool selection + SQL + lookups.
+# Sonnet is used once forecast_incidents or run_anomaly_detection is called —
+# these require deeper reasoning to interpret results and form the final answer.
+MODEL_DEFAULT = "claude-haiku-4-5-20251001"
+MODEL_COMPLEX = "claude-sonnet-4-20250514"
+COMPLEX_TOOLS = {"forecast_incidents", "run_anomaly_detection"}
 
 SYSTEM_PROMPT = """
 You are the IT Assistant bot, built for IT incident managers to quickly find information, diagnose issues, and understand incident trends.
@@ -394,6 +400,9 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
     chart_id: Optional[str] = None
     chart_title: Optional[str] = None
 
+    # Start with Haiku; upgrade to Sonnet if a complex tool is called
+    current_model = MODEL_DEFAULT
+
     # Full sql_query result — stored so plot_chart always gets all rows,
     # even though Claude only sees a capped version to stay within token limits.
     _full_sql_result: Optional[list] = None
@@ -413,7 +422,7 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
 
     while True:
         response = client.messages.create(
-            model=MODEL,
+            model=current_model,
             max_tokens=8192,
             system=SYSTEM_PROMPT,
             tools=TOOL_DEFINITIONS,
@@ -448,6 +457,10 @@ def run(user_message: str, thread_id: Optional[str] = None) -> Tuple[str, Option
                             inputs["series_data"] = _full_sql_result
 
                     result = _execute_tool(block.name, inputs)
+
+                    # Upgrade to Sonnet if a complex tool was just called
+                    if block.name in COMPLEX_TOOLS:
+                        current_model = MODEL_COMPLEX
 
                     # After sql_query: store full result, cap what Claude sees
                     if block.name == "sql_query":
