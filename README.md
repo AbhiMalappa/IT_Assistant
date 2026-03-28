@@ -154,6 +154,7 @@ show me incidents by priority
 /incident search network outage
 /incident status INC17089320
 /incident summary INC17089043
+/incident reset
 /incident help
 ```
 
@@ -195,7 +196,7 @@ No other code changes needed.
 IT_Assistant/
 ├── main.py                      # FastAPI entry point + Slack socket mode + /charts/{id} endpoint
 ├── bot/
-│   ├── agent.py                 # Agentic loop — Claude picks tools at runtime (8 tools)
+│   ├── agent.py                 # Agentic loop — Haiku by default, Sonnet for forecast/anomaly (7 tools)
 │   ├── tools.py                 # Tool implementations (search, SQL, lookup, forecast, anomaly, chart)
 │   ├── slack_handler.py         # Slack Bolt event handling — posts text + uploads PNG charts
 │   ├── conversation_manager.py  # Token-aware conversation memory (Supabase-backed)

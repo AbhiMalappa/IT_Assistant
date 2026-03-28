@@ -33,9 +33,9 @@ IT_Assistant/
 ├── main.py                            # FastAPI app entry point + Slack socket mode startup
 ├── bot/
 │   ├── slack_handler.py               # Slack Bolt event handling (messages, slash commands)
-│   ├── agent.py                       # Agentic loop: tool definitions, system prompt, Claude tool-use
-│   ├── tools.py                       # Tool implementations: search_incidents, sql_query, get_all_by_system, get_incident_by_number
-│   ├── conversation_manager.py        # [planned] Token-aware buffer memory, summarisation, tool tracking
+│   ├── agent.py                       # Agentic loop: tool definitions, system prompt, hybrid Haiku/Sonnet model
+│   ├── tools.py                       # Tool implementations: search_incidents, sql_query, get_all_by_system, get_incident_by_number, forecast, anomaly, chart
+│   ├── conversation_manager.py        # Token-aware buffer memory (5 turns), tiered truncation, reset()
 │   ├── claude_client.py               # Anthropic client singleton + model name
 │   └── rag_pipeline.py                # [reference] Original RAG logic — superseded by agent.py + tools.py
 ├── embeddings/
@@ -48,7 +48,7 @@ IT_Assistant/
 ├── db/
 │   ├── supabase_client.py             # Supabase client singleton
 │   ├── incidents.py                   # CRUD operations for incidents table
-│   └── conversation_messages.py       # [planned] CRUD for conversation_messages table
+│   └── conversation_messages.py       # CRUD for conversation_messages table (save, get_recent, delete_thread)
 ├── anomaly_detection/
 │   ├── __init__.py
 │   ├── analyser.py                    # Pre-flight checks, granularity/trend/seasonality detection, method options
@@ -85,20 +85,20 @@ User (Slack)
      ↓
 Slack Bolt (slack_handler.py)
      ↓
-Agent (agent.py)  ←── Claude decides which tool(s) to call at runtime
+Agent (agent.py)  ←── Haiku by default; upgrades to Sonnet when forecast/anomaly tools called
      ├── search_incidents()        → Pinecone (semantic search, top-k)
      │                             → Supabase (fetch full records)
      ├── get_incident_by_number()  → Supabase (exact INC lookup)
      ├── sql_query()               → Supabase (aggregation, counts, ranking)
+     │                             → also queries time_series_metrics (store_order_count, api_traffic)
      ├── get_all_by_system()       → Supabase (all incidents for a system)
-     ├── forecast_incidents()      → Supabase + ExponentialSmoothingForecaster
-     ├── analyse_for_anomalies()   → anomaly_detection/analyser.py (presents method options)
-     ├── run_anomaly_detection()   → anomaly_detection/detector.py (STL/MSTL/rolling Z-score)
+     ├── forecast_incidents()      → Supabase + ExponentialSmoothingForecaster [triggers Sonnet upgrade]
+     ├── run_anomaly_detection()   → anomaly_detection/detector.py (auto method) [triggers Sonnet upgrade]
      └── plot_chart()              → chart_png → /tmp/charts/*.png
           ↓
      Claude formulates final answer
           ↓
-     agent.run() returns (text, chart_path)
+     agent.run() returns (text, chart_path, chart_id)
           ↓
      slack_handler: posts text + uploads PNG via files_upload_v2
           ↓
@@ -474,7 +474,8 @@ Key details:
 | Anomaly Detection | STL/MSTL/rolling Z-score via `anomaly_detection/` | Two-step flow: analyse → user picks method → run. IQR capping, auto threshold (3–9) |
 | Agent Pattern | Claude tool-use | Claude decides RAG vs SQL vs direct lookup at runtime — no hardcoded intent classifier |
 | Aggregation | Text-to-SQL via psycopg2 | Pure RAG misses full dataset; SQL handles counts, rankings, trends correctly |
-| Conversation Memory | Supabase (swappable) | Token-aware buffer, dual storage (full + summary), tool tracking per message |
+| Conversation Memory | Supabase (swappable) | 5-turn / 2000-token buffer, tiered truncation (no LLM summarisation), tool tracking per message |
+| Model Strategy | Hybrid Haiku/Sonnet | Haiku by default (cheap/fast); upgrades to Sonnet mid-loop for forecast/anomaly interpretation |
 | Pinecone Namespaces | incidents / changes / documents / transcripts | Single index, partitioned by source type — no index changes needed when adding new sources |
 
 ---
@@ -512,8 +513,8 @@ Build in this sequence:
 
 ### Buffer Memory
 
-- **Window:** Last 10 turns (20 messages: 10 user + 10 assistant)
-- **Token budget:** Max 4000 tokens for history injected into Claude's context
+- **Window:** Last 5 turns (10 messages: 5 user + 5 assistant)
+- **Token budget:** Max 2000 tokens for history injected into Claude's context
 - **Retrieval order:** Start from most recent message, work backwards, stop when token budget is exceeded
 - Token count is stored per message at write time — no re-counting on retrieval
 
@@ -544,14 +545,15 @@ CREATE INDEX idx_thread_id_created ON conversation_messages(thread_id, created_a
 
 ---
 
-### Summarisation
+### Truncation (replaces LLM summarisation)
 
-Store **both** `full_content` and `summary` for every message.
+Store **both** `full_content` and a truncated `summary` — no extra API call.
 
-Trigger summarisation (`use_summary = TRUE`) when any of these are true:
-- `tool_used = 'sql_query'` — SQL results can be verbose
-- `tool_used = 'get_all_by_system'` — returns up to 100 records
-- Response token count exceeds 300 tokens
+Truncation limits by tool (`use_summary = TRUE` when triggered):
+- `sql_query`, `get_all_by_system` → 1200 chars (~300 tokens)
+- `forecast_incidents`, `run_anomaly_detection` → 2000 chars (~500 tokens)
+- All others → store full content (responses are already short)
+- Fallback: any response exceeding 500 tokens is truncated to 2000 chars
 
 When `use_summary = TRUE`:
 - Send `summary` to Claude in the buffer (not `full_content`)
